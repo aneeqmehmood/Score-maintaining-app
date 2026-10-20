@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Cricket Scorer — Ball-by-ball scoring, match history, score worm. Works offline.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cricket Scorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Fade-in on load */
+    body { opacity: 0; transition: opacity 0.3s ease; }
+    body.loaded { opacity: 1; }
+    .panel-hint { color: var(--text2); font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+    .match-card-result { margin-top: 8px; font-weight: 600; color: var(--accent); font-size: 13px; }
+    .result-icon { font-size: 48px; margin-bottom: 12px; position: relative; }
+    .result-actions { position: relative; margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Nav ─────────────────────────────────────────── -->
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-logo" id="btn-dashboard" role="button" tabindex="0" title="Go to Match Centre">
+      <div class="logo-icon">🏏</div>
+      <div>
+        <div class="logo-text">CRICKET</div>
+        <div class="logo-sub">Scorer</div>
+      </div>
+    </a>
+    <div class="topbar-actions">
+      <button class="btn-icon" id="theme-btn" title="Toggle light/dark mode" aria-label="Toggle theme">☀️</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SCREEN: DASHBOARD                                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <div class="app-container">
+
+    <div class="dashboard-header">
+      <h1>MATCH CENTRE</h1>
+      <p>Ball-by-ball cricket scoring · Persists offline · Works on mobile</p>
+    </div>
+
+    <div class="dashboard-actions">
+      <button class="btn btn-primary btn-lg" id="btn-new-match">＋ New Match</button>
+      <button class="btn btn-danger btn-sm"  id="btn-clear-history">🗑 Clear History</button>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">MATCHES</span>
+    </div>
+    <div class="matches-list" id="matches-list"></div>
+    <div style="height:56px"></div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SCREEN: CREATE MATCH                                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="screen-create" class="screen">
+  <div class="app-container">
+    <div style="padding:24px 0">
+      <div class="form-card">
+        <h2>NEW MATCH</h2>
+        <form id="form-create-match" novalidate>
+
+          <div class="form-group">
+            <label for="f-title">Match Title</label>
+            <input type="text" id="f-title" placeholder="e.g. League Final, Sunday T20" maxlength="60" autocomplete="off">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-teamA">Team A *</label>
+              <input type="text" id="f-teamA" placeholder="e.g. Strikers" required maxlength="30" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="f-teamB">Team B *</label>
+              <input type="text" id="f-teamB" placeholder="e.g. Raiders" required maxlength="30" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-overs">Overs Per Side</label>
+              <input type="number" id="f-overs" placeholder="0 = unlimited" min="0" max="100" value="0">
+            </div>
+            <div class="form-group">
+              <label for="f-date">Date &amp; Time</label>
+              <input type="datetime-local" id="f-date">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="f-venue">Venue (optional)</label>
+            <input type="text" id="f-venue" placeholder="e.g. Local Cricket Ground" maxlength="60" autocomplete="off">
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">🏏 Create Match</button>
+            <button type="button" class="btn btn-secondary" id="btn-cancel-create">Cancel</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SCREEN: MATCH                                          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="screen-match" class="screen">
+  <div class="app-container">
+
+    <!-- ── Match Header ──────────────────────────────── -->
+    <div class="match-header">
+      <div class="match-header-info">
+        <div class="match-title" id="match-title-display"></div>
+        <div class="match-meta"  id="match-meta-display"></div>
+      </div>
+      <div class="match-header-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-match-back">← Back</button>
+        <button class="btn btn-secondary btn-sm" id="btn-match-export" title="Export match data as JSON">⬇ JSON</button>
+        <button class="btn btn-secondary btn-sm" id="btn-match-print"  title="Print scorecard">🖨</button>
+        <button class="btn btn-danger    btn-sm" id="btn-match-reset"  title="Reset match to start over">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- ── Scoreboard ────────────────────────────────── -->
+    <div class="scoreboard" id="scoreboard"></div>
+
+    <!-- ── Info Strip ────────────────────────────────── -->
+    <div class="info-strip" id="info-strip"></div>
+
+    <!-- ── Tabs ──────────────────────────────────────── -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" role="tab" data-tab="tab-scoring"
+              onclick="App.activateTab('tab-scoring'); renderActiveTabContent();">Scoring</button>
+      <button class="tab-btn"        role="tab" data-tab="tab-history"
+              onclick="App.activateTab('tab-history'); renderActiveTabContent();">Overs</button>
+      <button class="tab-btn"        role="tab" data-tab="tab-summary"
+              onclick="App.activateTab('tab-summary'); renderActiveTabContent();">Summary</button>
+      <button class="tab-btn"        role="tab" data-tab="tab-chart"
+              onclick="App.activateTab('tab-chart');   renderActiveTabContent();">Chart</button>
+    </div>
+
+    <!-- ── Tab: Scoring ──────────────────────────────── -->
+    <div id="tab-scoring" class="tab-content active" role="tabpanel">
+      <div id="over-strip"></div>
+      <div class="scoring-panel" id="scoring-panel"></div>
+      <div id="result-section"></div>
+      <div id="innings-summaries"></div>
+      <!-- Live over history (last few overs) shown below summaries in scoring tab -->
+      <div id="over-history"></div>
+    </div>
+
+    <!-- ── Tab: Over History ─────────────────────────── -->
+    <div id="tab-history" class="tab-content" role="tabpanel">
+      <div id="over-history-tab">
+        <p class="text-muted" style="padding:20px">Switch to this tab during a match to see over-by-over breakdown.</p>
+      </div>
+    </div>
+
+    <!-- ── Tab: Summary ──────────────────────────────── -->
+    <div id="tab-summary" class="tab-content" role="tabpanel">
+      <div id="innings-summaries-tab">
+        <p class="text-muted" style="padding:20px">Innings summaries appear here once innings are complete.</p>
+      </div>
+    </div>
+
+    <!-- ── Tab: Chart ────────────────────────────────── -->
+    <div id="tab-chart" class="tab-content" role="tabpanel">
+      <div class="worm-chart">
+        <div class="worm-chart-title">SCORE WORM — CUMULATIVE RUNS OVER BALLS</div>
+        <canvas id="wormCanvas" style="width:100%;height:180px;display:block"></canvas>
+        <div style="display:flex;gap:20px;margin-top:12px;font-size:12px;color:var(--text3);font-family:var(--font-mono)">
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="width:18px;height:2.5px;background:#00d4aa;display:inline-block;border-radius:2px"></span>
+            1st Innings
+          </span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="width:18px;height:2.5px;background:#4facfe;display:inline-block;border-radius:2px"></span>
+            2nd Innings
+          </span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;background:#ff4e6a;display:inline-block;border-radius:50%"></span>
+            Wicket
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:56px"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODALS                                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+
+<!-- Extra Runs Modal (Wide / No Ball / Bye / Leg Bye) -->
+<div class="modal-overlay" id="modal-extra" role="dialog" aria-modal="true" aria-labelledby="modal-extra-title">
+  <div class="modal">
+    <h3 id="modal-extra-title">WIDE</h3>
+    <p  id="modal-extra-runs-label" style="margin-bottom:14px;color:var(--text2);font-size:13px">Additional runs?</p>
+    <div class="modal-input-row">
+      <button class="modal-num-btn selected" data-val="0">0</button>
+      <button class="modal-num-btn"          data-val="1">1</button>
+      <button class="modal-num-btn"          data-val="2">2</button>
+      <button class="modal-num-btn"          data-val="3">3</button>
+      <button class="modal-num-btn"          data-val="4">4</button>
+      <button class="modal-num-btn"          data-val="6">6</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-extra').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary"   id="btn-modal-extra-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm: End Innings -->
+<div class="modal-overlay" id="modal-confirm-end" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>END INNINGS?</h3>
+    <p>Manually close the current innings. Any remaining balls will not be bowled.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-confirm-end-no">Cancel</button>
+      <button class="btn btn-warning"   id="btn-confirm-end-yes">End Innings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm: Reset Match -->
+<div class="modal-overlay" id="modal-confirm-reset" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>RESET MATCH?</h3>
+    <p>This will clear all innings data and restart the match from setup. Match details (teams, date, venue) will be kept.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-confirm-reset-no">Cancel</button>
+      <button class="btn btn-danger"    id="btn-confirm-reset-yes">Reset Match</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm: Clear History -->
+<div class="modal-overlay" id="modal-confirm-clear" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>CLEAR ALL HISTORY?</h3>
+    <p>This permanently deletes every match saved in this browser. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-confirm-clear-no">Cancel</button>
+      <button class="btn btn-danger"    id="btn-confirm-clear-yes">Delete All</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ─────────────────────────────────── -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                               -->
+<!-- ══════════════════════════════════════════════════════ -->
+<script src="scoring.js"></script>
+<script src="storage.js"></script>
+<script src="match.js"></script>
+<script src="app.js"></script>
+<script>
+  // Called by tab buttons to render lazy tab content
+  function renderActiveTabContent() {
+    const m = window.__currentMatch;
+
+    // Overs tab
+    if (document.getElementById('tab-history').classList.contains('active')) {
+      const dest = document.getElementById('over-history-tab');
+      if (!m) return;
+      const innings = [
+        { inn: m.innings1,   label: '1st Innings' },
+        { inn: m.innings2,   label: '2nd Innings' },
+        { inn: m.superOver1, label: 'Super Over 1' },
+        { inn: m.superOver2, label: 'Super Over 2' },
+      ].filter(x => x.inn?.overHistory?.length > 0);
+
+      if (!innings.length) {
+        dest.innerHTML = '<p class="text-muted" style="padding:20px">No completed overs yet.</p>';
+      } else {
+        dest.innerHTML = innings.map(x =>
+          `<div style="margin-bottom:8px">
+            <div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:1px;padding:8px 0 4px">${x.label}</div>
+            ${App.buildOverHistoryHTML(x.inn)}
+          </div>`
+        ).join('');
+      }
+    }
+
+    // Summary tab
+    if (document.getElementById('tab-summary').classList.contains('active')) {
+      App.renderInningsSummaries('innings-summaries-tab');
+      const el = document.getElementById('innings-summaries-tab');
+      if (el && !el.innerHTML.trim()) {
+        el.innerHTML = '<p class="text-muted" style="padding:20px">Innings summaries appear here once an innings is complete.</p>';
+      }
+    }
+
+    // Chart tab
+    if (document.getElementById('tab-chart').classList.contains('active')) {
+      setTimeout(() => App.updateWormChart(), 40);
+    }
+  }
+</script>
+</body>
+</html>
